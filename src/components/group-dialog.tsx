@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -25,6 +25,7 @@ export function GroupDialog({
     initialName = "",
     onSave
 }: GroupDialogProps) {
+    const nameRef = useRef<HTMLInputElement>(null);
     const [name, setName] = useState(initialName);
 
     useEffect(() => {
@@ -38,7 +39,14 @@ export function GroupDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-sm">
+            <DialogContent
+                className="gap-0 overflow-hidden p-0 sm:max-w-sm"
+                onOpenAutoFocus={(e) => {
+                    e.preventDefault();
+                    nameRef.current?.focus();
+                    nameRef.current?.select();
+                }}
+            >
                 <DialogHeader className="border-b border-white/[0.06] px-5 py-4">
                     <DialogTitle className="text-base">{title}</DialogTitle>
                 </DialogHeader>
@@ -51,11 +59,11 @@ export function GroupDialog({
                         Group name
                     </Label>
                     <Input
+                        ref={nameRef}
                         id="group-name"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder="e.g. UNO, Pool, Poker..."
-                        autoFocus
                         className="h-11 rounded-xl bg-white/[0.04]"
                         onKeyDown={(e) => e.key === "Enter" && handleSave()}
                     />

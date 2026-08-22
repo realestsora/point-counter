@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,6 +39,7 @@ export function CounterDialog({
     onSave
 }: CounterDialogProps) {
     const isEdit = Boolean(counter);
+    const nameRef = useRef<HTMLInputElement>(null);
     const [name, setName] = useState(defaultName);
     const [color, setColor] = useState<string>(COUNTER_COLORS[0]);
     const [step, setStep] = useState("1");
@@ -78,7 +79,14 @@ export function CounterDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-md">
+            <DialogContent
+                className="gap-0 overflow-hidden p-0 sm:max-w-md"
+                onOpenAutoFocus={(e) => {
+                    e.preventDefault();
+                    nameRef.current?.focus();
+                    nameRef.current?.select();
+                }}
+            >
                 <DialogHeader className="border-b border-white/[0.06] px-5 py-4">
                     <DialogTitle className="text-base">
                         {isEdit ? "Edit player" : "Add player"}
@@ -114,11 +122,11 @@ export function CounterDialog({
                     <div className="grid gap-4">
                         <Field label="Name" htmlFor="counter-name">
                             <Input
+                                ref={nameRef}
                                 id="counter-name"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                                 placeholder="Player name"
-                                autoFocus
                                 className="h-11 rounded-xl bg-white/[0.04]"
                                 onKeyDown={(e) =>
                                     e.key === "Enter" && handleSave()
