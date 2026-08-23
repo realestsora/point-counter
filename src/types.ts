@@ -14,7 +14,12 @@ export interface Group {
     counters: Counter[];
 }
 
-export type HistoryKind = "adjust" | "set" | "reset" | "reset-all";
+export type HistoryKind =
+    | "adjust"
+    | "set"
+    | "reset"
+    | "reset-all"
+    | "delete";
 
 export interface HistoryEntry {
     id: string;
@@ -24,11 +29,14 @@ export interface HistoryEntry {
     counterId?: string;
     counterName?: string;
     counterColor?: string;
+    counterStep?: number;
     from?: number;
     to?: number;
     delta?: number;
     scores?: Record<string, number>;
     labels?: Record<string, string>;
+    snapshot?: Counter;
+    index?: number;
 }
 
 export interface AppState {

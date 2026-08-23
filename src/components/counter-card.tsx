@@ -15,6 +15,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
+import { useI18n } from "@/hooks/use-i18n";
 import type { CardDensity } from "@/lib/density";
 import type { Counter } from "@/types";
 import { cn } from "@/lib/utils";
@@ -54,6 +55,7 @@ export function CounterCard({
     onDelete,
     onReset
 }: CounterCardProps) {
+    const { t } = useI18n();
     const [bump, setBump] = useState(false);
     const prevScore = useRef(counter.score);
     const isGrid = density === "grid";
@@ -113,7 +115,7 @@ export function CounterCard({
                                 ? "top-1 right-1 size-6"
                                 : "top-1.5 right-1.5 size-7"
                         )}
-                        aria-label="Options"
+                        aria-label={t("options")}
                         onPointerDown={stopDrag}
                     >
                         <MoreHorizontal
@@ -122,13 +124,15 @@ export function CounterCard({
                     </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="min-w-40">
-                    <DropdownMenuItem onClick={onEdit}>Edit</DropdownMenuItem>
+                    <DropdownMenuItem onClick={onEdit}>
+                        {t("edit")}
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={onReset}>
-                        Reset score
+                        {t("resetScore")}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem variant="destructive" onClick={onDelete}>
-                        Delete
+                        {t("delete")}
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
@@ -167,7 +171,7 @@ export function CounterCard({
                             className="flex size-11 flex-1 items-center justify-center rounded-full bg-white text-neutral-900 shadow-[0_2px_8px_rgba(0,0,0,0.14)] transition-transform duration-100 active:scale-90"
                             onClick={() => adjust(-counter.step)}
                             onPointerDown={stopDrag}
-                            aria-label={`Decrease ${counter.name}`}
+                            aria-label={t("decrease", { name: counter.name })}
                         >
                             <Minus className="size-5" strokeWidth={2.6} />
                         </button>
@@ -176,7 +180,7 @@ export function CounterCard({
                             className="flex size-11 flex-1 items-center justify-center rounded-full bg-white text-neutral-900 shadow-[0_2px_8px_rgba(0,0,0,0.14)] transition-transform duration-100 active:scale-90"
                             onClick={() => adjust(counter.step)}
                             onPointerDown={stopDrag}
-                            aria-label={`Increase ${counter.name}`}
+                            aria-label={t("increase", { name: counter.name })}
                         >
                             <Plus className="size-5" strokeWidth={2.6} />
                         </button>
@@ -201,7 +205,7 @@ export function CounterCard({
                         )}
                         onClick={() => adjust(-counter.step)}
                         onPointerDown={stopDrag}
-                        aria-label={`Decrease ${counter.name}`}
+                        aria-label={t("decrease", { name: counter.name })}
                     >
                         <Minus
                             className={
@@ -262,7 +266,7 @@ export function CounterCard({
                         )}
                         onClick={() => adjust(counter.step)}
                         onPointerDown={stopDrag}
-                        aria-label={`Increase ${counter.name}`}
+                        aria-label={t("increase", { name: counter.name })}
                     >
                         <Plus
                             className={

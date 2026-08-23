@@ -1,5 +1,5 @@
 import { createCounter, createGroup, uid } from "@/lib/storage";
-import { restoreCounters } from "@/lib/history";
+import { clusterHistory, restoreCounters } from "@/lib/history";
 import type { AppState, Counter, Group, HistoryEntry, SortMode } from "@/types";
 import { MAX_HISTORY } from "@/types";
 
@@ -135,6 +135,7 @@ export function updateCounter(
             counterId: counter.id,
             counterName: patch.name ?? counter.name,
             counterColor: patch.color ?? counter.color,
+            counterStep: patch.step ?? counter.step,
             from: counter.score,
             to: patch.score,
             delta: patch.score - counter.score
@@ -164,6 +165,7 @@ export function adjustScore(
             counterId: counter.id,
             counterName: counter.name,
             counterColor: counter.color,
+            counterStep: counter.step,
             from: counter.score,
             to,
             delta
@@ -178,13 +180,30 @@ export function adjustScore(
 }
 
 export function deleteCounter(state: AppState, id: string): AppState {
-    return {
-        ...state,
-        groups: mapActiveGroup(state, (g) => ({
+    const group = findGroup(state);
+    const index = group?.counters.findIndex((c) => c.id === id) ?? -1;
+    const counter = index >= 0 ? group!.counters[index] : undefined;
+    if (!group || !counter) return state;
+
+    return withHistory(
+        state,
+        {
+            groupId: group.id,
+            kind: "delete",
+            counterId: counter.id,
+            counterName: counter.name,
+            counterColor: counter.color,
+            counterStep: counter.step,
+            from: counter.score,
+            to: counter.score,
+            snapshot: { ...counter },
+            index
+        },
+        mapActiveGroup(state, (g) => ({
             ...g,
             counters: g.counters.filter((c) => c.id !== id)
         }))
-    };
+    );
 }
 
 export function resetScores(state: AppState): AppState {
@@ -221,6 +240,7 @@ export function resetCounter(state: AppState, id: string): AppState {
             counterId: counter.id,
             counterName: counter.name,
             counterColor: counter.color,
+            counterStep: counter.step,
             from: counter.score,
             to: 0,
             delta: -counter.score
@@ -263,13 +283,13 @@ export function revertEntries(state: AppState, entryIds: string[]): AppState {
     const selected = state.history.filter((h) => idSet.has(h.id));
     if (!selected.length) return state;
 
-    const chronological =
+    const newestFirst =
         selected.length === 1
             ? selected
-            : [...selected].sort((a, b) => a.at - b.at);
+            : [...selected].sort((a, b) => b.at - a.at);
 
     const byGroup = new Map<string, HistoryEntry[]>();
-    for (const entry of chronological) {
+    for (const entry of newestFirst) {
         const list = byGroup.get(entry.groupId);
         if (list) list.push(entry);
         else byGroup.set(entry.groupId, [entry]);
@@ -289,13 +309,39 @@ export function revertEntries(state: AppState, entryIds: string[]): AppState {
     return {
         ...state,
         groups,
-        history: state.history.filter((h) => !idSet.has(h.id))
+        history: pruneHistory(
+            state.history.filter((h) => !idSet.has(h.id)),
+            groups
+        )
     };
 }
 
+function pruneHistory(
+    history: HistoryEntry[],
+    groups: AppState["groups"]
+): HistoryEntry[] {
+    const livingByGroup = new Map(
+        groups.map((g) => [g.id, new Set(g.counters.map((c) => c.id))])
+    );
+
+    return history.filter((h) => {
+        if (h.kind !== "delete" || !h.counterId) return true;
+        const living = livingByGroup.get(h.groupId);
+        return !living?.has(h.counterId);
+    });
+}
+
 export function undoLast(state: AppState): AppState {
-    const entry = state.history.find((h) => h.groupId === state.activeGroupId);
-    return entry ? revertEntries(state, [entry.id]) : state;
+    const groupEntries = state.history.filter(
+        (h) => h.groupId === state.activeGroupId
+    );
+    if (!groupEntries.length) return state;
+
+    const [latest] = clusterHistory(groupEntries);
+    return revertEntries(
+        state,
+        latest.entries.map((e) => e.id)
+    );
 }
 
 export function clearGroupHistory(state: AppState): AppState {

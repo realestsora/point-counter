@@ -6,7 +6,8 @@ import {
     History,
     RotateCcw,
     Trash2,
-    Undo2
+    Undo2,
+    UserMinus
 } from "lucide-react";
 import {
     AlertDialog,
@@ -26,14 +27,15 @@ import {
     SheetHeader,
     SheetTitle
 } from "@/components/ui/sheet";
-import { formatSigned, formatTime } from "@/lib/format";
+import { UndoConfirm } from "@/components/undo-confirm";
+import { useI18n } from "@/hooks/use-i18n";
+import { formatTime } from "@/lib/format";
 import {
     clusterHistory,
-    describeEntry,
-    entryBadge,
-    entryTitle,
-    summarizeCluster,
-    type HistoryCluster
+    displayCluster,
+    previewUndo,
+    type HistoryCluster,
+    type UndoPreview
 } from "@/lib/history";
 import type { HistoryEntry } from "@/types";
 import { cn } from "@/lib/utils";
@@ -44,23 +46,26 @@ interface HistorySheetProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     entries: HistoryEntry[];
+    livingIds: ReadonlySet<string>;
     onRevert: (id: string) => void;
     onRevertMany: (ids: string[]) => void;
     onClear: () => void;
 }
 
 type PendingUndo =
-    | { type: "one"; id: string; label: string }
-    | { type: "many"; ids: string[]; label: string };
+    | { type: "one"; id: string; preview: UndoPreview }
+    | { type: "many"; ids: string[]; preview: UndoPreview };
 
 export function HistorySheet({
     open,
     onOpenChange,
     entries,
+    livingIds,
     onRevert,
     onRevertMany,
     onClear
 }: HistorySheetProps) {
+    const { t } = useI18n();
     const [page, setPage] = useState(0);
     const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
     const [pendingUndo, setPendingUndo] = useState<PendingUndo | null>(null);
@@ -115,7 +120,7 @@ export function HistorySheet({
                         <div className="flex items-center justify-between gap-3">
                             <SheetTitle className="flex items-center gap-2 text-lg">
                                 <History className="size-5 text-[#5ED4FF]" />
-                                Score history
+                                {t("scoreHistory")}
                             </SheetTitle>
                             {entries.length > 0 && (
                                 <Button
@@ -126,12 +131,12 @@ export function HistorySheet({
                                     onClick={() => setClearOpen(true)}
                                 >
                                     <Trash2 className="size-3.5" />
-                                    Clear
+                                    {t("clear")}
                                 </Button>
                             )}
                         </div>
                         <SheetDescription className="text-white/40">
-                            Consecutive ± changes are grouped · tap to expand
+                            {t("historyHint")}
                         </SheetDescription>
                     </SheetHeader>
 
@@ -148,24 +153,14 @@ export function HistorySheet({
                                         <ClusterRow
                                             key={cluster.id}
                                             cluster={cluster}
+                                            livingIds={livingIds}
                                             isLatest={
                                                 safePage === 0 && index === 0
                                             }
                                             expanded={expanded.has(cluster.id)}
                                             onToggle={() => toggle(cluster.id)}
-                                            onRequestUndoOne={(id, label) =>
-                                                setPendingUndo({
-                                                    type: "one",
-                                                    id,
-                                                    label
-                                                })
-                                            }
-                                            onRequestUndoMany={(ids, label) =>
-                                                setPendingUndo({
-                                                    type: "many",
-                                                    ids,
-                                                    label
-                                                })
+                                            onRequestUndo={(pending) =>
+                                                setPendingUndo(pending)
                                             }
                                         />
                                     ))}
@@ -187,13 +182,17 @@ export function HistorySheet({
                                 }
                             >
                                 <ChevronLeft className="size-4" />
-                                Prev
+                                {t("prev")}
                             </Button>
                             <p className="text-xs tabular-nums text-white/45">
-                                Page {safePage + 1}/{totalPages}
+                                {t("pageOf", {
+                                    page: safePage + 1,
+                                    total: totalPages
+                                })}
                                 <span className="text-white/25">
                                     {" "}
-                                    · {clusters.length} groups
+                                    ·{" "}
+                                    {t("groupsCount", { n: clusters.length })}
                                 </span>
                             </p>
                             <Button
@@ -208,7 +207,7 @@ export function HistorySheet({
                                     )
                                 }
                             >
-                                Next
+                                {t("next")}
                                 <ChevronRight className="size-4" />
                             </Button>
                         </div>
@@ -216,38 +215,25 @@ export function HistorySheet({
                 </SheetContent>
             </Sheet>
 
-            <AlertDialog
+            <UndoConfirm
                 open={Boolean(pendingUndo)}
                 onOpenChange={(v) => !v && setPendingUndo(null)}
-            >
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Undo this change?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            {pendingUndo?.label ??
-                                "This will restore the previous score."}
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={confirmUndo}>
-                            Undo
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                preview={pendingUndo?.preview ?? null}
+                onConfirm={confirmUndo}
+            />
 
             <AlertDialog open={clearOpen} onOpenChange={setClearOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Clear history?</AlertDialogTitle>
+                        <AlertDialogTitle>
+                            {t("clearHistoryTitle")}
+                        </AlertDialogTitle>
                         <AlertDialogDescription>
-                            All score history for this group will be removed.
-                            This cannot be undone.
+                            {t("clearHistoryDesc")}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
                         <AlertDialogAction
                             variant="destructive"
                             onClick={() => {
@@ -255,7 +241,7 @@ export function HistorySheet({
                                 setClearOpen(false);
                             }}
                         >
-                            Clear
+                            {t("clear")}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -265,48 +251,46 @@ export function HistorySheet({
 }
 
 function EmptyState() {
+    const { t } = useI18n();
     return (
         <div className="flex flex-col items-center gap-3 py-16 text-center">
             <div className="flex size-14 items-center justify-center rounded-full bg-white/[0.05]">
                 <History className="size-6 text-white/25" />
             </div>
-            <p className="text-sm text-white/40">No score changes yet</p>
+            <p className="text-sm text-white/40">{t("noScoreChanges")}</p>
         </div>
     );
 }
 
 function ClusterRow({
     cluster,
+    livingIds,
     isLatest,
     expanded,
     onToggle,
-    onRequestUndoOne,
-    onRequestUndoMany
+    onRequestUndo
 }: {
     cluster: HistoryCluster;
+    livingIds: ReadonlySet<string>;
     isLatest: boolean;
     expanded: boolean;
     onToggle: () => void;
-    onRequestUndoOne: (id: string, label: string) => void;
-    onRequestUndoMany: (ids: string[], label: string) => void;
+    onRequestUndo: (pending: PendingUndo) => void;
 }) {
+    const { t, locale } = useI18n();
     const isChain = cluster.entries.length > 1;
     const first = cluster.entries[0];
-    const summary = isChain ? summarizeCluster(cluster.entries) : null;
+    const view = displayCluster(cluster.entries, locale);
+    const preview = previewUndo(cluster.entries, livingIds, locale);
 
-    const detail = isChain
-        ? `${summary!.label} · ${summary!.steps}×`
-        : describeEntry(first);
-
-    const badge = entryBadge(first, summary?.totalDelta);
-    const title = entryTitle(first);
-
-    const requestChainUndo = () => {
-        onRequestUndoMany(
-            cluster.entries.map((e) => e.id),
-            `Undo ${title}: ${detail}`
-        );
-    };
+    const meta = [
+        view.range,
+        view.steps > 1 ? t("taps", { n: view.steps }) : null,
+        formatTime(view.at, locale),
+        isLatest ? t("latest") : null
+    ]
+        .filter(Boolean)
+        .join(" · ");
 
     return (
         <li className="overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.03]">
@@ -320,27 +304,29 @@ function ClusterRow({
                     <div
                         className={cn(
                             "flex size-11 shrink-0 items-center justify-center rounded-full text-sm font-bold",
-                            first.kind === "reset-all"
+                            view.kind === "reset-all"
                                 ? "bg-white/10 text-white/60"
                                 : "text-white"
                         )}
                         style={
-                            first.counterColor
-                                ? { backgroundColor: first.counterColor }
+                            view.color
+                                ? { backgroundColor: view.color }
                                 : undefined
                         }
                     >
-                        {first.kind === "reset-all" ? (
+                        {view.kind === "reset-all" ? (
                             <RotateCcw className="size-4" />
+                        ) : view.kind === "delete" ? (
+                            <UserMinus className="size-4" />
                         ) : (
-                            badge
+                            view.badge
                         )}
                     </div>
 
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
                             <p className="truncate text-sm font-semibold">
-                                {title}
+                                {view.title}
                             </p>
                             {isChain && (
                                 <ChevronDown
@@ -351,14 +337,7 @@ function ClusterRow({
                                 />
                             )}
                         </div>
-                        <p className="truncate text-xs text-white/40">
-                            {detail}
-                            <span className="text-white/25">
-                                {" "}
-                                · {formatTime(first.at)}
-                            </span>
-                            {isLatest ? " · latest" : ""}
-                        </p>
+                        <p className="truncate text-xs text-white/40">{meta}</p>
                     </div>
                 </button>
 
@@ -367,55 +346,75 @@ function ClusterRow({
                     size="sm"
                     className="h-9 shrink-0 rounded-full bg-white/10 px-3 text-white hover:bg-white/15"
                     onClick={() => {
-                        if (isChain) requestChainUndo();
-                        else
-                            onRequestUndoOne(
-                                first.id,
-                                `Undo ${title}: ${describeEntry(first)}`
-                            );
+                        if (!preview) return;
+                        if (isChain) {
+                            onRequestUndo({
+                                type: "many",
+                                ids: cluster.entries.map((e) => e.id),
+                                preview
+                            });
+                        } else {
+                            onRequestUndo({
+                                type: "one",
+                                id: first.id,
+                                preview
+                            });
+                        }
                     }}
                 >
                     <Undo2 className="size-3.5" />
-                    Undo
+                    {t("undo")}
                 </Button>
             </div>
 
             {isChain && expanded && (
                 <ul className="history-scroll max-h-48 space-y-1 overflow-y-auto border-t border-white/[0.06] bg-black/20 px-3 py-2">
-                    {[...cluster.entries].reverse().map((entry, stepIdx) => (
-                        <li
-                            key={entry.id}
-                            className="flex items-center gap-2 rounded-xl px-2 py-1.5 text-xs"
-                        >
-                            <span className="w-5 shrink-0 text-center tabular-nums text-white/30">
-                                {stepIdx + 1}
-                            </span>
-                            <span className="min-w-0 flex-1 text-white/75">
-                                {entry.from} → {entry.to}
-                                <span className="text-white/35">
-                                    {" "}
-                                    ({formatSigned(entry.delta ?? 0)})
-                                </span>
-                            </span>
-                            <span className="shrink-0 text-white/30">
-                                {formatTime(entry.at)}
-                            </span>
-                            <button
-                                type="button"
-                                className="shrink-0 rounded-full px-2 py-1 text-white/50 hover:bg-white/10 hover:text-white"
-                                onClick={() =>
-                                    onRequestUndoOne(
-                                        entry.id,
-                                        `Undo step ${entry.from} → ${entry.to}`
-                                    )
-                                }
-                                title="Undo this step"
-                                aria-label="Undo this step"
+                    {[...cluster.entries].reverse().map((entry, stepIdx) => {
+                        const stepView = displayCluster([entry], locale);
+                        const stepPreview = previewUndo(
+                            [entry],
+                            livingIds,
+                            locale
+                        );
+                        return (
+                            <li
+                                key={entry.id}
+                                className="flex items-center gap-2 rounded-xl px-2 py-1.5 text-xs"
                             >
-                                <Undo2 className="size-3" />
-                            </button>
-                        </li>
-                    ))}
+                                <span className="w-5 shrink-0 text-center tabular-nums text-white/30">
+                                    {stepIdx + 1}
+                                </span>
+                                <span className="min-w-0 flex-1 tabular-nums text-white/75">
+                                    {stepView.range}
+                                    {stepView.badge && (
+                                        <span className="text-white/35">
+                                            {" "}
+                                            · {stepView.badge}
+                                        </span>
+                                    )}
+                                </span>
+                                <span className="shrink-0 text-white/30">
+                                    {formatTime(stepView.at, locale)}
+                                </span>
+                                <button
+                                    type="button"
+                                    className="shrink-0 rounded-full px-2 py-1 text-white/50 hover:bg-white/10 hover:text-white"
+                                    onClick={() => {
+                                        if (!stepPreview) return;
+                                        onRequestUndo({
+                                            type: "one",
+                                            id: entry.id,
+                                            preview: stepPreview
+                                        });
+                                    }}
+                                    title={t("undoThisStep")}
+                                    aria-label={t("undoThisStep")}
+                                >
+                                    <Undo2 className="size-3" />
+                                </button>
+                            </li>
+                        );
+                    })}
                 </ul>
             )}
         </li>

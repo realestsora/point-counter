@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useI18n } from "@/hooks/use-i18n";
 
 interface GroupDialogProps {
     open: boolean;
@@ -25,6 +26,7 @@ export function GroupDialog({
     initialName = "",
     onSave
 }: GroupDialogProps) {
+    const { t } = useI18n();
     const nameRef = useRef<HTMLInputElement>(null);
     const [name, setName] = useState(initialName);
 
@@ -33,7 +35,7 @@ export function GroupDialog({
     }, [open, initialName]);
 
     const handleSave = () => {
-        onSave(name.trim() || "Game");
+        onSave(name.trim() || t("game"));
         onOpenChange(false);
     };
 
@@ -56,14 +58,14 @@ export function GroupDialog({
                         htmlFor="group-name"
                         className="text-xs font-medium tracking-wide text-white/45 uppercase"
                     >
-                        Group name
+                        {t("groupName")}
                     </Label>
                     <Input
                         ref={nameRef}
                         id="group-name"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        placeholder="e.g. UNO, Pool, Poker..."
+                        placeholder={t("groupNamePlaceholder")}
                         className="h-11 rounded-xl bg-white/[0.04]"
                         onKeyDown={(e) => e.key === "Enter" && handleSave()}
                     />
@@ -76,14 +78,14 @@ export function GroupDialog({
                         className="h-10 rounded-xl px-4"
                         onClick={() => onOpenChange(false)}
                     >
-                        Cancel
+                        {t("cancel")}
                     </Button>
                     <Button
                         type="button"
                         className="h-10 rounded-xl bg-[#5ED4FF] px-5 font-semibold text-black hover:bg-[#5ED4FF]/90"
                         onClick={handleSave}
                     >
-                        Save
+                        {t("save")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

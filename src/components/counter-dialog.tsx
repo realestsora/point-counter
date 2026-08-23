@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useI18n } from "@/hooks/use-i18n";
 import { pickColor } from "@/lib/storage";
 import { COUNTER_COLORS, type Counter } from "@/types";
 import { cn } from "@/lib/utils";
@@ -34,13 +35,15 @@ export function CounterDialog({
     open,
     onOpenChange,
     counter,
-    defaultName = "Player",
+    defaultName,
     usedColors = [],
     onSave
 }: CounterDialogProps) {
+    const { t } = useI18n();
+    const fallbackName = defaultName ?? t("player");
     const isEdit = Boolean(counter);
     const nameRef = useRef<HTMLInputElement>(null);
-    const [name, setName] = useState(defaultName);
+    const [name, setName] = useState(fallbackName);
     const [color, setColor] = useState<string>(COUNTER_COLORS[0]);
     const [step, setStep] = useState("1");
     const [score, setScore] = useState("0");
@@ -56,7 +59,7 @@ export function CounterDialog({
             return;
         }
 
-        setName(defaultName);
+        setName(fallbackName);
         setColor(pickColor(usedColors));
         setStep("1");
         setScore("0");
@@ -67,7 +70,7 @@ export function CounterDialog({
         const parsedScore = Number.parseInt(score, 10);
 
         onSave({
-            name: name.trim() || defaultName,
+            name: name.trim() || fallbackName,
             color,
             step: parsedStep,
             score: Number.isFinite(parsedScore) ? parsedScore : 0
@@ -89,7 +92,7 @@ export function CounterDialog({
             >
                 <DialogHeader className="border-b border-white/[0.06] px-5 py-4">
                     <DialogTitle className="text-base">
-                        {isEdit ? "Edit player" : "Add player"}
+                        {isEdit ? t("editPlayer") : t("addPlayer")}
                     </DialogTitle>
                 </DialogHeader>
 
@@ -110,7 +113,7 @@ export function CounterDialog({
                                     {previewScore}
                                 </div>
                                 <div className="mt-1.5 truncate text-sm font-semibold text-white/95">
-                                    {name.trim() || defaultName}
+                                    {name.trim() || fallbackName}
                                 </div>
                             </div>
                             <div className="flex size-12 items-center justify-center rounded-full bg-white text-neutral-900 shadow-sm">
@@ -120,13 +123,13 @@ export function CounterDialog({
                     </div>
 
                     <div className="grid gap-4">
-                        <Field label="Name" htmlFor="counter-name">
+                        <Field label={t("name")} htmlFor="counter-name">
                             <Input
                                 ref={nameRef}
                                 id="counter-name"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
-                                placeholder="Player name"
+                                placeholder={t("playerName")}
                                 className="h-11 rounded-xl bg-white/[0.04]"
                                 onKeyDown={(e) =>
                                     e.key === "Enter" && handleSave()
@@ -135,7 +138,7 @@ export function CounterDialog({
                         </Field>
 
                         {isEdit && (
-                            <Field label="Score" htmlFor="counter-score">
+                            <Field label={t("score")} htmlFor="counter-score">
                                 <Input
                                     id="counter-score"
                                     type="number"
@@ -146,7 +149,7 @@ export function CounterDialog({
                             </Field>
                         )}
 
-                        <Field label="Step ±" htmlFor="counter-step">
+                        <Field label={t("step")} htmlFor="counter-step">
                             <div className="flex gap-2">
                                 {STEP_PRESETS.map((n) => (
                                     <button
@@ -174,7 +177,7 @@ export function CounterDialog({
                             </div>
                         </Field>
 
-                        <Field label="Color">
+                        <Field label={t("color")}>
                             <div className="grid grid-cols-5 gap-2.5">
                                 {COUNTER_COLORS.map((c) => (
                                     <button
@@ -188,7 +191,7 @@ export function CounterDialog({
                                                 : "opacity-75 hover:opacity-100"
                                         )}
                                         style={{ backgroundColor: c }}
-                                        aria-label={`Color ${c}`}
+                                        aria-label={t("colorSwatch", { c })}
                                     />
                                 ))}
                             </div>
@@ -203,14 +206,14 @@ export function CounterDialog({
                         className="h-10 rounded-xl px-4"
                         onClick={() => onOpenChange(false)}
                     >
-                        Cancel
+                        {t("cancel")}
                     </Button>
                     <Button
                         type="button"
                         className="h-10 rounded-xl bg-[#5ED4FF] px-5 font-semibold text-black hover:bg-[#5ED4FF]/90"
                         onClick={handleSave}
                     >
-                        Save
+                        {t("save")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

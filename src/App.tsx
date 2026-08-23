@@ -30,6 +30,7 @@ import { CounterCard } from "@/components/counter-card";
 import { CounterDialog } from "@/components/counter-dialog";
 import { GroupDialog } from "@/components/group-dialog";
 import { HistorySheet } from "@/components/history-sheet";
+import { UndoConfirm } from "@/components/undo-confirm";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -53,27 +54,24 @@ import {
     DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { useI18n } from "@/hooks/use-i18n";
 import { useScoreboard } from "@/hooks/use-scoreboard";
 import { getCardDensity } from "@/lib/density";
 import { playerCountLabel } from "@/lib/format";
+import { latestUndoPreview } from "@/lib/history";
+import type { Locale } from "@/lib/i18n";
 import type { Counter, SortMode } from "@/types";
 import { SORT_ORDER } from "@/types";
 import { cn } from "@/lib/utils";
 
-const SORT_META: Record<
-    SortMode,
-    { label: string; short: string; icon: typeof ListFilter }
-> = {
-    manual: { label: "Manual (drag)", short: "Manual", icon: ListFilter },
-    high: {
-        label: "High → low",
-        short: "High → low",
-        icon: ArrowDownNarrowWide
-    },
-    low: { label: "Low → high", short: "Low → high", icon: ArrowUpNarrowWide }
-};
+const SORT_ICONS = {
+    manual: ListFilter,
+    high: ArrowDownNarrowWide,
+    low: ArrowUpNarrowWide
+} as const;
 
 export default function App() {
+    const { t, locale, setLocale } = useI18n();
     const board = useScoreboard();
     const {
         groups,
@@ -113,11 +111,31 @@ export default function App() {
     );
     const density = getCardDensity(sortedCounters.length);
     const canReorder = sortMode === "manual";
-    const SortIcon = SORT_META[sortMode].icon;
+    const SortIcon = SORT_ICONS[sortMode];
     const sortStrategy =
         density === "grid"
             ? rectSortingStrategy
             : verticalListSortingStrategy;
+    const livingIds = useMemo(
+        () => new Set(sortedCounters.map((c) => c.id)),
+        [sortedCounters]
+    );
+    const undoPreview = useMemo(
+        () => latestUndoPreview(groupHistory, livingIds, locale),
+        [groupHistory, livingIds, locale]
+    );
+
+    const sortLabel = (mode: SortMode) => {
+        if (mode === "manual") return t("sortManual");
+        if (mode === "high") return t("sortHigh");
+        return t("sortLow");
+    };
+
+    const sortShort = (mode: SortMode) => {
+        if (mode === "manual") return t("sortManualShort");
+        if (mode === "high") return t("sortHigh");
+        return t("sortLow");
+    };
 
     const openAddCounter = () => {
         setEditingCounter(null);
@@ -146,9 +164,9 @@ export default function App() {
     };
 
     const subtitle = [
-        playerCountLabel(sortedCounters.length),
-        sortMode !== "manual" ? SORT_META[sortMode].short : null,
-        canReorder && sortedCounters.length > 1 ? "drag to reorder" : null
+        playerCountLabel(sortedCounters.length, locale),
+        sortMode !== "manual" ? sortShort(sortMode) : null,
+        canReorder && sortedCounters.length > 1 ? t("dragToReorder") : null
     ]
         .filter(Boolean)
         .join(" · ");
@@ -159,14 +177,14 @@ export default function App() {
                 <div className="flex items-center gap-2 px-4 py-3.5">
                     <div className="min-w-0 flex-1">
                         <h1 className="truncate text-[1.75rem] leading-none font-bold tracking-tight">
-                            {activeGroup?.name ?? "Scoreboard"}
+                            {activeGroup?.name ?? t("scoreboard")}
                         </h1>
                         <p className="mt-1 text-xs text-white/50">{subtitle}</p>
                     </div>
 
                     <div className="flex shrink-0 items-center gap-0.5">
                         <IconBtn
-                            label="Undo"
+                            label={t("undo")}
                             disabled={!canUndo}
                             onClick={() => setUndoOpen(true)}
                             className={cn(!canUndo && "opacity-25")}
@@ -178,7 +196,7 @@ export default function App() {
                         </IconBtn>
 
                         <IconBtn
-                            label="History"
+                            label={t("history")}
                             onClick={() => setHistoryOpen(true)}
                             className="relative"
                         >
@@ -192,7 +210,7 @@ export default function App() {
                         </IconBtn>
 
                         <IconBtn
-                            label={`Sort: ${SORT_META[sortMode].label}`}
+                            label={`${t("sort")}: ${sortLabel(sortMode)}`}
                             onClick={cycleSort}
                             className={cn(
                                 sortMode !== "manual" &&
@@ -210,7 +228,7 @@ export default function App() {
                                 <button
                                     type="button"
                                     className="flex size-10 items-center justify-center rounded-full text-white/80 transition-colors hover:bg-white/10 hover:text-white"
-                                    aria-label="Menu"
+                                    aria-label={t("menu")}
                                 >
                                     <MoreHorizontal
                                         className="size-5"
@@ -229,7 +247,7 @@ export default function App() {
                                     }}
                                 >
                                     <Pencil className="size-4" />
-                                    Rename group
+                                    {t("renameGroup")}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                     onClick={() => {
@@ -238,13 +256,13 @@ export default function App() {
                                     }}
                                 >
                                     <Plus className="size-4" />
-                                    New group
+                                    {t("newGroup")}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                     onClick={() => setResetOpen(true)}
                                 >
                                     <RotateCcw className="size-4" />
-                                    Reset all scores
+                                    {t("resetAllScores")}
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuCheckboxItem
@@ -253,10 +271,12 @@ export default function App() {
                                         board.setShowTotal(checked === true)
                                     }
                                 >
-                                    Show total score
+                                    {t("showTotalScore")}
                                 </DropdownMenuCheckboxItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuLabel>Sort</DropdownMenuLabel>
+                                <DropdownMenuLabel>
+                                    {t("sort")}
+                                </DropdownMenuLabel>
                                 <DropdownMenuRadioGroup
                                     value={sortMode}
                                     onValueChange={(v) =>
@@ -264,13 +284,30 @@ export default function App() {
                                     }
                                 >
                                     <DropdownMenuRadioItem value="manual">
-                                        Manual (drag)
+                                        {t("sortManual")}
                                     </DropdownMenuRadioItem>
                                     <DropdownMenuRadioItem value="high">
-                                        High → low
+                                        {t("sortHigh")}
                                     </DropdownMenuRadioItem>
                                     <DropdownMenuRadioItem value="low">
-                                        Low → high
+                                        {t("sortLow")}
+                                    </DropdownMenuRadioItem>
+                                </DropdownMenuRadioGroup>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuLabel>
+                                    {t("language")}
+                                </DropdownMenuLabel>
+                                <DropdownMenuRadioGroup
+                                    value={locale}
+                                    onValueChange={(v) =>
+                                        setLocale(v as Locale)
+                                    }
+                                >
+                                    <DropdownMenuRadioItem value="en">
+                                        {t("langEn")}
+                                    </DropdownMenuRadioItem>
+                                    <DropdownMenuRadioItem value="vi">
+                                        {t("langVi")}
                                     </DropdownMenuRadioItem>
                                 </DropdownMenuRadioGroup>
                                 <DropdownMenuSeparator />
@@ -280,7 +317,7 @@ export default function App() {
                                     onClick={() => setDeleteGroupOpen(true)}
                                 >
                                     <Trash2 className="size-4" />
-                                    Delete group
+                                    {t("deleteGroup")}
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
@@ -335,10 +372,13 @@ export default function App() {
                         </div>
                         <div className="min-w-0 flex-1">
                             <p className="text-[11px] font-medium tracking-wide text-white/45">
-                                Combined score
+                                {t("combinedScore")}
                             </p>
                             <p className="truncate text-xs text-white/30">
-                                {playerCountLabel(sortedCounters.length)}
+                                {playerCountLabel(
+                                    sortedCounters.length,
+                                    locale
+                                )}
                             </p>
                         </div>
                         <p className="shrink-0 text-2xl leading-none font-bold tabular-nums tracking-tight text-[#5ED4FF]">
@@ -356,10 +396,10 @@ export default function App() {
                         </div>
                         <div>
                             <p className="font-medium text-white/85">
-                                No players yet
+                                {t("noPlayersYet")}
                             </p>
                             <p className="mt-1 text-sm text-white/45">
-                                Add a player to start scoring
+                                {t("addPlayerToStart")}
                             </p>
                         </div>
                         <Button
@@ -368,7 +408,7 @@ export default function App() {
                             onClick={openAddCounter}
                         >
                             <Plus className="size-4" />
-                            Add player
+                            {t("addPlayer")}
                         </Button>
                     </div>
                 ) : (
@@ -416,7 +456,7 @@ export default function App() {
             <footer className="mt-auto shrink-0 px-5 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
                 <div className="flex h-[3.75rem] items-end justify-between gap-3">
                     <p className="pb-0.5 text-[11px] leading-none tracking-wide text-white/30">
-                        Made by Sora with{" "}
+                        {t("madeBy")}{" "}
                         <span className="text-[#FF5C8A]" aria-hidden>
                             ♥
                         </span>
@@ -430,7 +470,7 @@ export default function App() {
                     type="button"
                     onClick={openAddCounter}
                     className="pointer-events-auto flex size-[3.75rem] items-center justify-center rounded-full bg-[#5ED4FF] text-[#0b1b24] shadow-[0_10px_28px_rgba(94,212,255,0.45)] transition-transform active:scale-90"
-                    aria-label="Add player"
+                    aria-label={t("addPlayer")}
                 >
                     <Plus className="size-8" strokeWidth={2.5} />
                 </button>
@@ -440,7 +480,9 @@ export default function App() {
                 open={counterDialogOpen}
                 onOpenChange={setCounterDialogOpen}
                 counter={editingCounter}
-                defaultName={`Player ${(activeGroup?.counters.length ?? 0) + 1}`}
+                defaultName={t("playerN", {
+                    n: (activeGroup?.counters.length ?? 0) + 1
+                })}
                 usedColors={usedColors}
                 onSave={(data) => {
                     if (editingCounter) {
@@ -459,7 +501,7 @@ export default function App() {
             <GroupDialog
                 open={groupDialogOpen}
                 onOpenChange={setGroupDialogOpen}
-                title={renamingGroup ? "Rename group" : "New group"}
+                title={renamingGroup ? t("renameGroup") : t("newGroup")}
                 initialName={renamingGroup ? (activeGroup?.name ?? "") : ""}
                 onSave={(name) => {
                     if (renamingGroup && activeGroup)
@@ -472,33 +514,21 @@ export default function App() {
                 open={historyOpen}
                 onOpenChange={setHistoryOpen}
                 entries={groupHistory}
+                livingIds={livingIds}
                 onRevert={board.revertEntry}
                 onRevertMany={board.revertEntries}
                 onClear={board.clearHistory}
             />
 
-            <AlertDialog open={undoOpen} onOpenChange={setUndoOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Undo last change?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            The most recent score change in this group will be
-                            reverted.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={() => {
-                                board.undoLast();
-                                setUndoOpen(false);
-                            }}
-                        >
-                            Undo
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+            <UndoConfirm
+                open={undoOpen}
+                onOpenChange={setUndoOpen}
+                preview={undoPreview}
+                onConfirm={() => {
+                    board.undoLast();
+                    setUndoOpen(false);
+                }}
+            />
 
             <AlertDialog
                 open={Boolean(pendingDelete)}
@@ -506,14 +536,17 @@ export default function App() {
             >
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Delete player?</AlertDialogTitle>
+                        <AlertDialogTitle>
+                            {t("deletePlayerTitle")}
+                        </AlertDialogTitle>
                         <AlertDialogDescription>
-                            &quot;{pendingDelete?.name}&quot; and their score
-                            will be removed from this group.
+                            {t("deletePlayerDesc", {
+                                name: pendingDelete?.name ?? ""
+                            })}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
                         <AlertDialogAction
                             variant="destructive"
                             onClick={() => {
@@ -522,7 +555,7 @@ export default function App() {
                                 setPendingDelete(null);
                             }}
                         >
-                            Delete
+                            {t("delete")}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -531,16 +564,19 @@ export default function App() {
             <AlertDialog open={resetOpen} onOpenChange={setResetOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Reset all scores?</AlertDialogTitle>
+                        <AlertDialogTitle>
+                            {t("resetAllTitle")}
+                        </AlertDialogTitle>
                         <AlertDialogDescription>
-                            Scores in &quot;{activeGroup?.name}&quot; will go to
-                            0. You can undo from history.
+                            {t("resetAllDesc", {
+                                name: activeGroup?.name ?? ""
+                            })}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
                         <AlertDialogAction onClick={board.resetScores}>
-                            Reset
+                            {t("reset")}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -552,21 +588,24 @@ export default function App() {
             >
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Delete group?</AlertDialogTitle>
+                        <AlertDialogTitle>
+                            {t("deleteGroupTitle")}
+                        </AlertDialogTitle>
                         <AlertDialogDescription>
-                            &quot;{activeGroup?.name}&quot; and all its scores
-                            will be removed.
+                            {t("deleteGroupDesc", {
+                                name: activeGroup?.name ?? ""
+                            })}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
                         <AlertDialogAction
                             variant="destructive"
                             onClick={() =>
                                 activeGroup && board.deleteGroup(activeGroup.id)
                             }
                         >
-                            Delete
+                            {t("delete")}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
