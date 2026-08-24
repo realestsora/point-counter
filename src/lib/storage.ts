@@ -1,10 +1,11 @@
+import { v4 as uuidv4 } from "uuid";
 import type { AppState, Counter, Group } from "@/types";
 import { COUNTER_COLORS } from "@/types";
 
 const STORAGE_KEY = "point-counter-state";
 
 export function uid() {
-    return crypto.randomUUID();
+    return uuidv4();
 }
 
 export function pickColor(used: readonly string[] = []) {

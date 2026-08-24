@@ -58,6 +58,14 @@ export function useScoreboard() {
         setState((prev) => sb.deleteGroup(prev, id));
     }, []);
 
+    const duplicateGroup = useCallback((id: string, name: string) => {
+        setState((prev) => sb.duplicateGroup(prev, id, name));
+    }, []);
+
+    const reorderGroups = useCallback((orderedIds: string[]) => {
+        setState((prev) => sb.reorderGroups(prev, orderedIds));
+    }, []);
+
     const addCounter = useCallback((name: string, color: string, step = 1) => {
         setState((prev) => sb.addCounter(prev, name, color, step));
     }, []);
@@ -117,6 +125,8 @@ export function useScoreboard() {
         addGroup,
         renameGroup,
         deleteGroup,
+        duplicateGroup,
+        reorderGroups,
         addCounter,
         updateCounter,
         adjustScore,

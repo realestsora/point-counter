@@ -153,6 +153,7 @@ export function HistorySheet({
                                         <ClusterRow
                                             key={cluster.id}
                                             cluster={cluster}
+                                            groupEntries={entries}
                                             livingIds={livingIds}
                                             isLatest={
                                                 safePage === 0 && index === 0
@@ -264,6 +265,7 @@ function EmptyState() {
 
 function ClusterRow({
     cluster,
+    groupEntries,
     livingIds,
     isLatest,
     expanded,
@@ -271,6 +273,7 @@ function ClusterRow({
     onRequestUndo
 }: {
     cluster: HistoryCluster;
+    groupEntries: HistoryEntry[];
     livingIds: ReadonlySet<string>;
     isLatest: boolean;
     expanded: boolean;
@@ -281,7 +284,12 @@ function ClusterRow({
     const isChain = cluster.entries.length > 1;
     const first = cluster.entries[0];
     const view = displayCluster(cluster.entries, locale);
-    const preview = previewUndo(cluster.entries, livingIds, locale);
+    const preview = previewUndo(
+        cluster.entries,
+        livingIds,
+        locale,
+        groupEntries
+    );
 
     const meta = [
         view.range,
@@ -374,7 +382,8 @@ function ClusterRow({
                         const stepPreview = previewUndo(
                             [entry],
                             livingIds,
-                            locale
+                            locale,
+                            groupEntries
                         );
                         return (
                             <li

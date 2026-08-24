@@ -10,6 +10,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useI18n } from "@/hooks/use-i18n";
+import { isTouchPrimary } from "@/lib/utils";
 
 interface GroupDialogProps {
     open: boolean;
@@ -45,6 +46,7 @@ export function GroupDialog({
                 className="gap-0 overflow-hidden p-0 sm:max-w-sm"
                 onOpenAutoFocus={(e) => {
                     e.preventDefault();
+                    if (isTouchPrimary()) return;
                     nameRef.current?.focus();
                     nameRef.current?.select();
                 }}

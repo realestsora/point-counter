@@ -17,6 +17,7 @@ import {
 import {
     ArrowDownNarrowWide,
     ArrowUpNarrowWide,
+    Copy,
     History,
     ListFilter,
     MoreHorizontal,
@@ -26,9 +27,11 @@ import {
     Trash2,
     Undo2
 } from "lucide-react";
+import { AddFab } from "@/components/add-fab";
 import { CounterCard } from "@/components/counter-card";
 import { CounterDialog } from "@/components/counter-dialog";
 import { GroupDialog } from "@/components/group-dialog";
+import { GroupTabs } from "@/components/group-tabs";
 import { HistorySheet } from "@/components/history-sheet";
 import { UndoConfirm } from "@/components/undo-confirm";
 import {
@@ -53,7 +56,6 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useI18n } from "@/hooks/use-i18n";
 import { useScoreboard } from "@/hooks/use-scoreboard";
 import { getCardDensity } from "@/lib/density";
@@ -259,6 +261,21 @@ export default function App() {
                                     {t("newGroup")}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
+                                    disabled={!activeGroup}
+                                    onClick={() => {
+                                        if (!activeGroup) return;
+                                        board.duplicateGroup(
+                                            activeGroup.id,
+                                            t("groupCopy", {
+                                                name: activeGroup.name
+                                            })
+                                        );
+                                    }}
+                                >
+                                    <Copy className="size-4" />
+                                    {t("duplicateGroup")}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
                                     onClick={() => setResetOpen(true)}
                                 >
                                     <RotateCcw className="size-4" />
@@ -324,46 +341,12 @@ export default function App() {
                     </div>
                 </div>
 
-                {groups.length > 1 && (
-                    <ScrollArea className="w-full whitespace-nowrap">
-                        <div className="flex gap-2 px-4 pb-3.5">
-                            {groups.map((group) => {
-                                const active = group.id === activeGroup?.id;
-                                return (
-                                    <button
-                                        key={group.id}
-                                        type="button"
-                                        onClick={() =>
-                                            board.setActiveGroupId(group.id)
-                                        }
-                                        className={cn(
-                                            "rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-all",
-                                            active
-                                                ? "bg-white text-black shadow-sm"
-                                                : "bg-white/[0.12] text-white/70 hover:bg-white/[0.16] hover:text-white"
-                                        )}
-                                    >
-                                        {group.name}
-                                        <span
-                                            className={cn(
-                                                "ml-1.5 tabular-nums",
-                                                active
-                                                    ? "text-black/45"
-                                                    : "text-white/45"
-                                            )}
-                                        >
-                                            {group.counters.length}
-                                        </span>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                        <ScrollBar
-                            orientation="horizontal"
-                            className="invisible"
-                        />
-                    </ScrollArea>
-                )}
+                <GroupTabs
+                    groups={groups}
+                    activeGroupId={activeGroup?.id ?? ""}
+                    onSelect={board.setActiveGroupId}
+                    onReorder={board.reorderGroups}
+                />
 
                 {showTotal && sortedCounters.length > 0 && (
                     <div className="mx-4 mb-3 flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#5ED4FF]/12 via-white/[0.04] to-white/[0.04] px-3.5 py-2.5 ring-1 ring-[#5ED4FF]/20">
@@ -454,27 +437,20 @@ export default function App() {
             </main>
 
             <footer className="mt-auto shrink-0 px-5 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
-                <div className="flex h-[3.75rem] items-end justify-between gap-3">
+                <div className="flex h-[3.75rem] items-end">
                     <p className="pb-0.5 text-[11px] leading-none tracking-wide text-white/30">
                         {t("madeBy")}{" "}
                         <span className="text-[#FF5C8A]" aria-hidden>
                             ♥
                         </span>
                     </p>
-                    <div className="size-[3.75rem] shrink-0" aria-hidden />
                 </div>
             </footer>
 
-            <div className="pointer-events-none fixed inset-x-0 bottom-0 z-20 mx-auto flex max-w-md justify-end p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
-                <button
-                    type="button"
-                    onClick={openAddCounter}
-                    className="pointer-events-auto flex size-[3.75rem] items-center justify-center rounded-full bg-[#5ED4FF] text-[#0b1b24] shadow-[0_10px_28px_rgba(94,212,255,0.45)] transition-transform active:scale-90"
-                    aria-label={t("addPlayer")}
-                >
-                    <Plus className="size-8" strokeWidth={2.5} />
-                </button>
-            </div>
+            <AddFab
+                onClick={openAddCounter}
+                label={`${t("addPlayer")} · ${t("holdToMoveFab")}`}
+            />
 
             <CounterDialog
                 open={counterDialogOpen}

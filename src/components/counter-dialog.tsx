@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { useI18n } from "@/hooks/use-i18n";
 import { pickColor } from "@/lib/storage";
 import { COUNTER_COLORS, type Counter } from "@/types";
-import { cn } from "@/lib/utils";
+import { cn, isTouchPrimary } from "@/lib/utils";
 
 const STEP_PRESETS = [1, 5, 10] as const;
 
@@ -86,6 +86,7 @@ export function CounterDialog({
                 className="gap-0 overflow-hidden p-0 sm:max-w-md"
                 onOpenAutoFocus={(e) => {
                     e.preventDefault();
+                    if (isTouchPrimary()) return;
                     nameRef.current?.focus();
                     nameRef.current?.select();
                 }}

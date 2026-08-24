@@ -37,6 +37,33 @@ export interface UndoPreview {
     deltaLabel: string | null;
     color?: string;
     willRestorePlayer?: boolean;
+    /** Newer history items (same group) that will also be removed */
+    truncateCount?: number;
+}
+
+/** Entries that linear undo will drop beyond the ones explicitly selected. */
+export function countTruncatedHistory(
+    groupHistory: HistoryEntry[],
+    selected: HistoryEntry[]
+): number {
+    if (!selected.length || !groupHistory.length) return 0;
+
+    const selectedIds = new Set(selected.map((e) => e.id));
+    const cutoffByGroup = new Map<string, number>();
+    for (const entry of selected) {
+        const prev = cutoffByGroup.get(entry.groupId);
+        if (prev === undefined || entry.at < prev) {
+            cutoffByGroup.set(entry.groupId, entry.at);
+        }
+    }
+
+    let extra = 0;
+    for (const entry of groupHistory) {
+        const cutoff = cutoffByGroup.get(entry.groupId);
+        if (cutoff === undefined || entry.at < cutoff) continue;
+        if (!selectedIds.has(entry.id)) extra += 1;
+    }
+    return extra;
 }
 
 export const CLUSTER_GAP_MS = 5000;
@@ -251,7 +278,8 @@ function isPlayerMissing(
 export function previewUndo(
     entries: HistoryEntry[],
     livingIds?: ReadonlySet<string>,
-    locale: Locale = "en"
+    locale: Locale = "en",
+    groupHistory?: HistoryEntry[]
 ): UndoPreview | null {
     if (!entries.length) return null;
 
@@ -261,10 +289,16 @@ export function previewUndo(
     const missing = isPlayerMissing(entries, livingIds);
     const removed = t(locale, "removed");
     const previous = t(locale, "previous");
+    const truncateCount = groupHistory
+        ? countTruncatedHistory(groupHistory, entries)
+        : 0;
+
+    const withTruncate = (preview: UndoPreview): UndoPreview =>
+        truncateCount > 0 ? { ...preview, truncateCount } : preview;
 
     if (first.kind === "reset-all") {
         const n = Object.keys(first.scores ?? {}).length;
-        return {
+        return withTruncate({
             title: t(locale, "undoResetAllTitle"),
             subject,
             currentScore: "0",
@@ -274,12 +308,12 @@ export function previewUndo(
             steps: 1,
             deltaLabel: null,
             color: first.counterColor
-        };
+        });
     }
 
     if (first.kind === "delete") {
         const score = first.snapshot?.score ?? first.from ?? 0;
-        return {
+        return withTruncate({
             title: t(locale, "restorePlayerTitle", { name: subject }),
             subject,
             currentScore: removed,
@@ -293,7 +327,7 @@ export function previewUndo(
             deltaLabel: null,
             color: first.counterColor,
             willRestorePlayer: true
-        };
+        });
     }
 
     const restoreNote = missing
@@ -327,7 +361,7 @@ export function previewUndo(
         }
         explanation += restoreNote;
 
-        return {
+        return withTruncate({
             title: missing
                 ? t(locale, "restoreUndoPlayerTitle", { name: subject })
                 : t(locale, "undoPlayerTitle", { name: subject }),
@@ -340,7 +374,7 @@ export function previewUndo(
             deltaLabel: delta,
             color: entry.counterColor,
             willRestorePlayer: missing
-        };
+        });
     }
 
     const summary = summarizeCluster(entries);
@@ -348,7 +382,7 @@ export function previewUndo(
     const restored = String(summary.from);
     const delta = formatSigned(summary.totalDelta);
 
-    return {
+    return withTruncate({
         title: missing
             ? t(locale, "restoreUndoPlayerTitle", { name: subject })
             : t(locale, "undoPlayerTitle", { name: subject }),
@@ -367,7 +401,7 @@ export function previewUndo(
         deltaLabel: delta,
         color: first.counterColor,
         willRestorePlayer: missing
-    };
+    });
 }
 
 export function latestUndoPreview(
@@ -377,5 +411,5 @@ export function latestUndoPreview(
 ): UndoPreview | null {
     const clusters = clusterHistory(entries);
     if (!clusters.length) return null;
-    return previewUndo(clusters[0].entries, livingIds, locale);
+    return previewUndo(clusters[0].entries, livingIds, locale, entries);
 }

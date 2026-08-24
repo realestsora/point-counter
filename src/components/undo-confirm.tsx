@@ -53,6 +53,15 @@ export function UndoConfirm({
                                                 {t("playerMissingNote")}
                                             </p>
                                         )}
+                                    {(preview.truncateCount ?? 0) > 0 && (
+                                        <p className="text-xs text-amber-300/90">
+                                            {(preview.truncateCount ?? 0) === 1
+                                                ? t("truncateHistoryNote_one")
+                                                : t("truncateHistoryNote_other", {
+                                                      n: preview.truncateCount ?? 0
+                                                  })}
+                                        </p>
+                                    )}
                                     {preview.steps > 1 && (
                                         <p className="text-xs text-muted-foreground/80">
                                             {t("groupedTapsNote")}

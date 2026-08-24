@@ -86,6 +86,53 @@ export function deleteGroup(state: AppState, id: string): AppState {
     };
 }
 
+export function duplicateGroup(
+    state: AppState,
+    id: string,
+    name: string
+): AppState {
+    const source = findGroup(state, id);
+    if (!source) return state;
+
+    const copy: Group = {
+        id: uid(),
+        name: name.trim() || source.name,
+        counters: source.counters.map((c) => ({
+            ...c,
+            id: uid()
+        }))
+    };
+
+    const index = state.groups.findIndex((g) => g.id === id);
+    const groups = [...state.groups];
+    groups.splice(index < 0 ? groups.length : index + 1, 0, copy);
+
+    return {
+        ...state,
+        groups,
+        activeGroupId: copy.id
+    };
+}
+
+export function reorderGroups(
+    state: AppState,
+    orderedIds: string[]
+): AppState {
+    const byId = new Map(state.groups.map((g) => [g.id, g]));
+    const ordered: Group[] = [];
+    for (const id of orderedIds) {
+        const g = byId.get(id);
+        if (g) {
+            ordered.push(g);
+            byId.delete(id);
+        }
+    }
+    return {
+        ...state,
+        groups: [...ordered, ...byId.values()]
+    };
+}
+
 export function addCounter(
     state: AppState,
     name: string,
@@ -276,6 +323,11 @@ export function reorderCounters(
     };
 }
 
+/**
+ * Linear undo: rewind every history entry from the tip down through the
+ * oldest selected entry (same group), then drop that whole suffix.
+ * Undoing a middle item never leaves “future” patches behind.
+ */
 export function revertEntries(state: AppState, entryIds: string[]): AppState {
     if (!entryIds.length) return state;
 
@@ -283,21 +335,32 @@ export function revertEntries(state: AppState, entryIds: string[]): AppState {
     const selected = state.history.filter((h) => idSet.has(h.id));
     if (!selected.length) return state;
 
-    const newestFirst =
-        selected.length === 1
-            ? selected
-            : [...selected].sort((a, b) => b.at - a.at);
+    // Per group: oldest selected timestamp is the rewind cutoff
+    const cutoffByGroup = new Map<string, number>();
+    for (const entry of selected) {
+        const prev = cutoffByGroup.get(entry.groupId);
+        if (prev === undefined || entry.at < prev) {
+            cutoffByGroup.set(entry.groupId, entry.at);
+        }
+    }
 
-    const byGroup = new Map<string, HistoryEntry[]>();
-    for (const entry of newestFirst) {
-        const list = byGroup.get(entry.groupId);
+    // history is newest-first — collect suffix in that order
+    const removeIds = new Set<string>();
+    const rewindByGroup = new Map<string, HistoryEntry[]>();
+
+    for (const entry of state.history) {
+        const cutoff = cutoffByGroup.get(entry.groupId);
+        if (cutoff === undefined || entry.at < cutoff) continue;
+
+        removeIds.add(entry.id);
+        const list = rewindByGroup.get(entry.groupId);
         if (list) list.push(entry);
-        else byGroup.set(entry.groupId, [entry]);
+        else rewindByGroup.set(entry.groupId, [entry]);
     }
 
     const groups = state.groups.map((group) => {
-        const entries = byGroup.get(group.id);
-        if (!entries) return group;
+        const entries = rewindByGroup.get(group.id);
+        if (!entries?.length) return group;
 
         let counters = group.counters;
         for (const entry of entries) {
@@ -310,7 +373,7 @@ export function revertEntries(state: AppState, entryIds: string[]): AppState {
         ...state,
         groups,
         history: pruneHistory(
-            state.history.filter((h) => !idSet.has(h.id)),
+            state.history.filter((h) => !removeIds.has(h.id)),
             groups
         )
     };
